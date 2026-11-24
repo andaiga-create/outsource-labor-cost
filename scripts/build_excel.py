@@ -281,3 +281,44 @@ def write(root, records, excluded, latest, settings):
     path = os.path.join(out_dir, f'외주인건비_보고서_{ly}.{lm:02d}.xlsx')
     wb.save(path)
     return path
+
+
+def write_raw(root, records, excluded):
+    """기존 '월간 인건비 보고서' 의 파워쿼리(김해공장+AS RAW DATA) 가 읽는 형식 그대로 저장.
+    시트명 sheet1, 12개 열. 보고서 쪽 쿼리가 CP/CQ·LWN- 규칙을 다시 적용하므로
+    1단계를 통과한 행(대시보드 행 + 제외내역 행)을 모두 넣는다."""
+    from openpyxl import Workbook
+    cols = ['입고일자', '거래처명', '품목번호', '품명', '단위', '수량', '단가', '공급가',
+            '프로젝트코드', '프로젝트명', '비고', '구분']
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'sheet1'
+    ws.append(cols)
+
+    def qty(v):
+        try:
+            f = float(str(v).replace(',', ''))
+            return int(f) if f.is_integer() else f
+        except (TypeError, ValueError):
+            return None
+    rows = [[r['date'], r['vendor'], r['pn'], r['name'], r['unit'], qty(r['qty']), r['price'], r['amt'],
+             r['code'], r['pname'], r['note'], r['kind']] for r in records]
+    for e in excluded:
+        p = e.get('단가')
+        try:
+            p = int(round(float(str(p).replace(',', ''))))
+        except (TypeError, ValueError):
+            p = None
+        rows.append([e['입고일'], e.get('거래처명'), e.get('품목번호'), e.get('품명'), e.get('단위'),
+                     qty(e.get('수량')), p, e['공급가_'], e.get('프로젝트코드'), e.get('프로젝트명'),
+                     e.get('비고'), e['구분']])
+    rows.sort(key=lambda x: (str(x[0]), x[11], str(x[1])))
+    for r in rows:
+        ws.append(r)
+    for row in ws.iter_rows(min_row=2):
+        row[0].number_format = 'yyyy-mm-dd'
+    out_dir = os.path.join(root, '엑셀보고서', 'RAW')
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, '김해공장+AS RAW.xlsx')
+    wb.save(path)
+    return path, len(rows)

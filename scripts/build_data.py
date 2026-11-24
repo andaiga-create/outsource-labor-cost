@@ -246,15 +246,19 @@ def main():
         print(f'  {m:02d}월{g:>14,}{a:>14,}{g + a:>14,}')
     print(f'\n→ {os.path.relpath(OUT, ROOT)} 저장 완료')
 
-    # ---- 검증용 엑셀 보고서 ----
+    # ---- 엑셀 출력: 검증용 보고서 + 기존 월간 보고서 쿼리용 RAW ----
     try:
         import build_excel
-        path = build_excel.write(ROOT, records, excluded, data['latest'], SETTINGS())
-        print(f'→ {os.path.relpath(path, ROOT)} 저장 완료 (검증용 엑셀)')
     except ImportError as e:
-        print(f'  [주의] 엑셀 보고서 생략: {e}  (pip install openpyxl)')
-    except PermissionError:
-        print('  [주의] 엑셀 보고서가 열려 있어 저장하지 못했습니다. 엑셀을 닫고 다시 실행하세요.')
+        print(f'  [주의] 엑셀 출력 생략: {e}  (pip install openpyxl)')
+        return
+    for label, fn in [('검증용 엑셀', lambda: (build_excel.write(ROOT, records, excluded, data['latest'], SETTINGS()), None)),
+                      ('기존 월간 보고서 쿼리용 RAW', lambda: build_excel.write_raw(ROOT, records, excluded))]:
+        try:
+            path, n = fn()
+            print(f'→ {os.path.relpath(path, ROOT)} 저장 완료 ({label}{f", {n:,}행" if n else ""})')
+        except PermissionError:
+            print(f'  [주의] {label} 파일이 열려 있어 저장하지 못했습니다. 엑셀을 닫고 다시 실행하세요.')
 
 
 if __name__ == '__main__':
