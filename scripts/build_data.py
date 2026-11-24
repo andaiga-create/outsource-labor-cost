@@ -25,6 +25,7 @@ except ImportError:
     sys.exit('[ERROR] xlrd 가 없습니다:  pip install xlrd')
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'docs', 'data.json')
 
 # (폴더, 구분, 규칙)  — 각 폴더 바로 안의 xls 만 읽음 (하위 폴더는 따로 지정)
@@ -141,8 +142,16 @@ def segment(code):
     return '상선' if t in ('C1', 'C2') else '특수선' if t == 'S1' else '유상'
 
 
+def SETTINGS():
+    try:
+        with open(os.path.join(ROOT, 'docs', 'settings.json'), encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
 def main():
-    records, dupkeys, nfiles = [], defaultdict(set), 0
+    records, excluded, dupkeys, nfiles = [], [], defaultdict(set), 0
     print('원본 읽는 중...')
     for folder, kind, rule in SOURCES:
         d = os.path.join(ROOT, folder)
@@ -160,6 +169,11 @@ def main():
             fn = os.path.relpath(f, ROOT)
             for r in s1:
                 if not stage2(r):
+                    pn, pc = r.get('품목번호'), r.get('프로젝트코드')
+                    why = ('품목번호에 CP/CQ 없음' if pn is None or ('CP' not in str(pn) and 'CQ' not in str(pn))
+                           else '프로젝트코드 없음' if pc is None else '프로젝트코드 LWN-')
+                    excluded.append(dict(r, 사유=why, 구분=kind, 파일=fn,
+                                         입고일=to_date(r.get('입고일자'), datemode), 공급가_=to_int(r.get('공급가'))))
                     continue
                 cnt2 += 1
                 dt = to_date(r.get('입고일자'), datemode)
@@ -174,7 +188,10 @@ def main():
                     dupkeys[key].add(fn)
                 records.append(dict(y=dt.year, m=dt.month, d=dt.isoformat(), kind=kind,
                                     vendor=str(r.get('거래처명') or ''), cust=cust, ship=ship,
-                                    equip=equip, seg=segment(code), amt=amt))
+                                    equip=equip, seg=segment(code), amt=amt, date=dt, code=code,
+                                    pn=r.get('품목번호'), name=r.get('품명'), unit=r.get('단위'),
+                                    qty=num(r.get('수량')), price=to_int(r.get('단가')),
+                                    pname=r.get('프로젝트명'), note=r.get('비고'), file=fn))
         print(f'  {folder:<22} 파일 {len(files):>3}개 · 1단계 {cnt1:>5}행 · 최종 {cnt2:>5}행')
 
     if not records:
@@ -228,6 +245,16 @@ def main():
         g, a = bm[m]['김해공장'], bm[m]['AS']
         print(f'  {m:02d}월{g:>14,}{a:>14,}{g + a:>14,}')
     print(f'\n→ {os.path.relpath(OUT, ROOT)} 저장 완료')
+
+    # ---- 검증용 엑셀 보고서 ----
+    try:
+        import build_excel
+        path = build_excel.write(ROOT, records, excluded, data['latest'], SETTINGS())
+        print(f'→ {os.path.relpath(path, ROOT)} 저장 완료 (검증용 엑셀)')
+    except ImportError as e:
+        print(f'  [주의] 엑셀 보고서 생략: {e}  (pip install openpyxl)')
+    except PermissionError:
+        print('  [주의] 엑셀 보고서가 열려 있어 저장하지 못했습니다. 엑셀을 닫고 다시 실행하세요.')
 
 
 if __name__ == '__main__':
