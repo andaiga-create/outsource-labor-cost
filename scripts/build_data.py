@@ -27,12 +27,13 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'docs', 'data.json')
 
-# (폴더, 구분, 규칙)  — 새 폴더가 생기면 여기에 한 줄 추가
+# (폴더, 구분, 규칙)  — 각 폴더 바로 안의 xls 만 읽음 (하위 폴더는 따로 지정)
+#   원본_AS/2024년까지 → 과거 규칙,  원본_AS 에 바로 넣은 파일 → 2025년 이후 규칙
 SOURCES = [
-    ('AS/2024년까지',       'AS',     'legacy'),
-    ('김해공장/2024년까지', '김해공장', 'legacy'),
-    ('AS (2025~)',          'AS',     'as2025'),
-    ('김해공장 (2025~)',    '김해공장', 'gh2025'),
+    ('원본_AS/2024년까지',       'AS',     'legacy'),
+    ('원본_김해공장/2024년까지', '김해공장', 'legacy'),
+    ('원본_AS',                  'AS',     'as2025'),
+    ('원본_김해공장',            '김해공장', 'gh2025'),
 ]
 REQUIRED = ['입고일자', '거래처명', '품목번호', '공급가', '프로젝트코드']
 ALIASES = {'규격/재질': '규격'}
@@ -174,7 +175,7 @@ def main():
                 records.append(dict(y=dt.year, m=dt.month, d=dt.isoformat(), kind=kind,
                                     vendor=str(r.get('거래처명') or ''), cust=cust, ship=ship,
                                     equip=equip, seg=segment(code), amt=amt))
-        print(f'  {folder:<18} 파일 {len(files):>3}개 · 1단계 {cnt1:>5}행 · 최종 {cnt2:>5}행')
+        print(f'  {folder:<22} 파일 {len(files):>3}개 · 1단계 {cnt1:>5}행 · 최종 {cnt2:>5}행')
 
     if not records:
         sys.exit('[ERROR] 읽은 데이터가 없습니다.')
